@@ -18,7 +18,9 @@ This is seriously tiny, so I'd suggest you just copy the `pb.py` file into your 
 ## Supported scalar types
 
 - Integers: `varint`/`uint64`, `uint32`, `int64`, `int32`, `sint`/`sint64`, `sint32`
-- Fixed-width: `fixed32`, `fixed64`, `float`, `double`
+- Fixed-width (unsigned): `fixed32`, `fixed64`
+- Fixed-width (signed): `sfixed32`, `sfixed64`
+- Floating-point: `float`, `double`
 - Other: `bool`, `string` (UTF‑8), `bytes`
 
 

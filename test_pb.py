@@ -67,6 +67,100 @@ c["values"] = {
 }
 CASES.append(c)
 
+"""
+# Signed fixed singletons: sfixed32 and sfixed64
+
+# Golden bits repro steps:
+tmp=$(mktemp -d); cd "$tmp"
+cat > signed_fixed.proto <<'PROTO'
+syntax = "proto3";
+package testpb;
+message SignedFixed {
+  sfixed32 a = 1;
+  sfixed64 b = 2;
+}
+PROTO
+protoc --python_out=. signed_fixed.proto
+python3 - <<'PY'
+import signed_fixed_pb2
+m = signed_fixed_pb2.SignedFixed(a=-2, b=-3)
+b = m.SerializeToString()
+print('b"' + ''.join(f'\\x{c:02x}' for c in b) + '"')
+PY
+"""
+c = {}
+c["name"] = "signed_fixed_singletons"
+c["proto"] = '''
+syntax = "proto3";
+package testpb;
+message SignedFixed {
+  sfixed32 a = 1;
+  sfixed64 b = 2;
+}
+'''.strip()
+c["schema"] = [
+    ("sfixed32", "a", 1),
+    ("sfixed64", "b", 2),
+]
+# field 1 (wt=5): 0x0d, -2 => fe ff ff ff
+# field 2 (wt=1): 0x11, -3 => fd ff ff ff ff ff ff ff
+c["blob"] = b"\x0d\xfe\xff\xff\xff\x11\xfd\xff\xff\xff\xff\xff\xff\xff"
+c["values"] = {
+    "a": -2,
+    "b": -3,
+}
+CASES.append(c)
+
+"""
+# Packed signed fixed: repeated sfixed32 and sfixed64
+
+# Golden bits repro steps:
+tmp=$(mktemp -d); cd "$tmp"
+cat > packed_signed_fixed.proto <<'PROTO'
+syntax = "proto3";
+package testpb;
+message PackedSignedFixed {
+  repeated sfixed32 a = 1;
+  repeated sfixed64 b = 2;
+}
+PROTO
+protoc --python_out=. packed_signed_fixed.proto
+python3 - <<'PY'
+import packed_signed_fixed_pb2
+vals_a = [-1, 0, 1, 0x7fffffff, -2147483648]
+vals_b = [-1, -2, 0, 1, 0x7fffffffffffffff, -9223372036854775808]
+m = packed_signed_fixed_pb2.PackedSignedFixed(a=vals_a, b=vals_b)
+b = m.SerializeToString()
+print('b"' + ''.join(f'\\x{c:02x}' for c in b) + '"')
+PY
+"""
+c = {}
+c["name"] = "packed_signed_fixed"
+c["proto"] = '''
+syntax = "proto3";
+package testpb;
+message PackedSignedFixed {
+  repeated sfixed32 a = 1;
+  repeated sfixed64 b = 2;
+}
+'''.strip()
+c["schema"] = [
+    ("repeated", "a", 1, "sfixed32"),
+    ("repeated", "b", 2, "sfixed64"),
+]
+# a: [-1,0,1,0x7fffffff,-2147483648]
+# tag=0x0a, len=0x14, payload=
+#   ff ff ff ff | 00 00 00 00 | 01 00 00 00 | ff ff ff 7f | 00 00 00 80
+# b: [-1,-2,0,1,0x7fffffffffffffff,-9223372036854775808]
+# tag=0x12, len=0x30, payload=
+#   ff*8 | fe ff ff ff ff ff ff ff | 00*8 | 01 00*7 | ff*7 7f | 00*7 80
+c["blob"] = b"\x0a\x14\xff\xff\xff\xff\x00\x00\x00\x00\x01\x00\x00\x00\xff\xff\xff\x7f\x00\x00\x00\x80\x12\x30\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\x7f\x00\x00\x00\x00\x00\x00\x00\x80"
+c["values"] = {
+    "a": [-1, 0, 1, 0x7fffffff, -2147483648],
+    "b": [-1, -2, 0, 1, 0x7fffffffffffffff, -9223372036854775808],
+}
+CASES.append(c)
+
 
 """
 # oneof parity for individual selections and decode last-wins.

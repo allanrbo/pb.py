@@ -98,10 +98,20 @@ def _write_fixed64(v):
     return struct.pack("<Q", v)
 
 
+def _write_sfixed32(v):
+    return struct.pack("<i", int(v))
+
+
+def _write_sfixed64(v):
+    return struct.pack("<q", int(v))
+
+
 # Tuple-based schema only.
 _ScalarTypes = {
     # integer families
     "varint", "uint64", "uint32", "int64", "int32", "sint", "sint64", "sint32",
+    # signed fixed-width integers
+    "sfixed32", "sfixed64",
     # fixed-width integer/float
     "fixed32", "fixed64", "float", "double",
     # misc
@@ -169,7 +179,7 @@ def _normalize_schema(schema):
         elif len(item) == 4:
             kind, name, fid, spec = item
             if kind == "packed":
-                if spec not in {"varint", "sint", "fixed32", "fixed64"}:
+                if spec not in {"varint", "uint64", "uint32", "int64", "int32", "sint", "sint64", "sint32", "fixed32", "fixed64", "sfixed32", "sfixed64", "float", "double", "bool"}:
                     raise ValueError(f"unsupported packed elem {spec}")
                 fields[int(fid)] = {"kind": "packed", "type": spec, "name": name}
             elif kind == "message":
@@ -215,8 +225,12 @@ def _encode_packed(vals, elem_type):
             out += _write_varint(_zz32(v))
         elif elem_type == "fixed32":
             out += _write_fixed32(int(v))
+        elif elem_type == "sfixed32":
+            out += _write_sfixed32(v)
         elif elem_type == "fixed64":
             out += _write_fixed64(int(v))
+        elif elem_type == "sfixed64":
+            out += _write_sfixed64(v)
         elif elem_type == "float":
             out += struct.pack("<f", float(v))
         elif elem_type == "double":
@@ -308,9 +322,15 @@ def pb_encode(values, schema=None):
             elif spec["kind"] == "scalar" and t == "fixed32":
                 out += _write_key(field, 5)
                 out += _write_fixed32(int(v))
+            elif spec["kind"] == "scalar" and t == "sfixed32":
+                out += _write_key(field, 5)
+                out += _write_sfixed32(v)
             elif spec["kind"] == "scalar" and t == "fixed64":
                 out += _write_key(field, 1)
                 out += _write_fixed64(int(v))
+            elif spec["kind"] == "scalar" and t == "sfixed64":
+                out += _write_key(field, 1)
+                out += _write_sfixed64(v)
             elif spec["kind"] == "scalar" and t == "float":
                 out += _write_key(field, 5)
                 out += struct.pack("<f", float(v))
@@ -330,7 +350,7 @@ def pb_encode(values, schema=None):
                 _ld_write(field, inner)
             elif spec["kind"] == "repeated" and "type" in spec:
                 # Proto3 default: pack eligible numeric types into one segment
-                if spec["type"] in {"varint", "uint64", "uint32", "int64", "int32", "sint", "sint64", "sint32", "fixed32", "fixed64", "float", "double", "bool"}:
+                if spec["type"] in {"varint", "uint64", "uint32", "int64", "int32", "sint", "sint64", "sint32", "fixed32", "fixed64", "sfixed32", "sfixed64", "float", "double", "bool"}:
                     packed = _encode_packed(vals, spec["type"])  # use prepared list
                     _ld_write(field, packed)
                     break  # emitted entire list as one segment
@@ -393,8 +413,12 @@ def pb_decode(buf, schema=None, _depth=0, _max_depth=_MAX_NESTING_DEPTH):
                     v = bool(v)
         elif wt == 1:
             v, i = _read_fixed64(b, i)
-            if spec and spec.get("type") == "double":
-                v = struct.unpack("<d", struct.pack("<Q", v))[0]
+            if spec:
+                tt = spec.get("type")
+                if tt == "double":
+                    v = struct.unpack("<d", struct.pack("<Q", v))[0]
+                elif tt == "sfixed64":
+                    v = v - 0x10000000000000000 if v >= 0x8000000000000000 else v
         elif wt == 2:
             length, i = _read_varint(b, i)
             if i + length > n:
@@ -404,7 +428,7 @@ def pb_decode(buf, schema=None, _depth=0, _max_depth=_MAX_NESTING_DEPTH):
             t = spec.get("type") if spec else None
             if spec and spec.get("kind") == "message":
                 v = pb_decode(chunk, spec["schema"], _depth=_depth+1, _max_depth=_max_depth)
-            elif spec and spec.get("kind") == "repeated" and "type" in spec and t in {"varint", "sint", "fixed32", "fixed64"}:
+            elif spec and spec.get("kind") == "repeated" and "type" in spec and t in {"varint", "uint64", "uint32", "int64", "int32", "sint", "sint64", "sint32", "fixed32", "fixed64", "sfixed32", "sfixed64", "float", "double", "bool"}:
                 # Proto3 default: repeated numeric are packed; flatten into list
                 v = _decode_packed(chunk, t)
             elif spec and spec.get("kind") == "repeated" and "schema" in spec:
@@ -419,8 +443,12 @@ def pb_decode(buf, schema=None, _depth=0, _max_depth=_MAX_NESTING_DEPTH):
                 v = chunk
         elif wt == 5:
             v, i = _read_fixed32(b, i)
-            if spec and spec.get("type") == "float":
-                v = struct.unpack("<f", struct.pack("<I", v))[0]
+            if spec:
+                tt = spec.get("type")
+                if tt == "float":
+                    v = struct.unpack("<f", struct.pack("<I", v))[0]
+                elif tt == "sfixed32":
+                    v = v - 0x100000000 if v >= 0x80000000 else v
         else:
             raise ValueError("unsupported wire type {}".format(wt))
 
@@ -487,8 +515,16 @@ def _decode_packed(chunk, elem_type):
         elif elem_type == "fixed32":
             v, i = _read_fixed32(b, i)
             out.append(v)
+        elif elem_type == "sfixed32":
+            v, i = _read_fixed32(b, i)
+            v = v - 0x100000000 if v >= 0x80000000 else v
+            out.append(v)
         elif elem_type == "fixed64":
             v, i = _read_fixed64(b, i)
+            out.append(v)
+        elif elem_type == "sfixed64":
+            v, i = _read_fixed64(b, i)
+            v = v - 0x10000000000000000 if v >= 0x8000000000000000 else v
             out.append(v)
         elif elem_type == "float":
             v, i = _read_fixed32(b, i)
