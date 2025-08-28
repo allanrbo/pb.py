@@ -106,7 +106,6 @@ def _write_sfixed64(v):
     return struct.pack("<q", int(v))
 
 
-# Tuple-based schema only.
 _ScalarTypes = {
     # integer families
     "varint", "uint64", "uint32", "int64", "int32", "sint", "sint64", "sint32",
@@ -129,6 +128,7 @@ def _normalize_schema(schema):
     for item in schema:
         if not isinstance(item, tuple):
             raise TypeError("schema must be list of tuples")
+
         # oneof group: ("oneof", group_name, [ alternatives ])
         if len(item) == 3 and item[0] == "oneof":
             _, group_name, alts = item
@@ -165,6 +165,7 @@ def _normalize_schema(schema):
                 else:
                     raise ValueError("unsupported tuple length in oneof alternative")
             continue
+
         if len(item) == 3:
             typ_or_schema, name, fid = item
             # Message singletons: first element is a subschema list

@@ -89,6 +89,16 @@ special dict form. See test_pb.py for examples of this. You only really need
 this if your have recursive/circular protos.
 
 
+## Conformance
+
+How do I know this is actually compatible with real protobuf? `test_pb.py`
+contains a series of tests where I compare that this decodes bytes that were
+encoded using Google's official protobuf libraries, as well as encode and get
+bitwise the same output as with using Google's official protobuf. Comment
+blocks with the repro steps I used to get those "golden" official samples
+are in there too.
+
+
 ## AI
 
 Written with support from GPT-5.
