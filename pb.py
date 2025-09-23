@@ -249,7 +249,7 @@ def _write_key(field, wt):
 
 
 # Encoder (proto3 binary)
-def pb_encode(values, schema=None):
+def encode(values, schema=None):
     ns = _normalize_schema(schema)
     out = bytearray()
 
@@ -347,7 +347,7 @@ def pb_encode(values, schema=None):
                 bs = bytes(v)
                 _ld_write(field, bs)
             elif spec["kind"] == "message":
-                inner = pb_encode(v, spec["schema"])
+                inner = encode(v, spec["schema"])
                 _ld_write(field, inner)
             elif spec["kind"] == "repeated" and "type" in spec:
                 # Proto3 default: pack eligible numeric types into one segment
@@ -367,7 +367,7 @@ def pb_encode(values, schema=None):
                         raise ValueError("unsupported repeated scalar type {}".format(spec["type"]))
             elif spec["kind"] == "repeated" and "schema" in spec:
                 # repeated message: each v is a dict for one message instance
-                inner = pb_encode(v, spec["schema"])
+                inner = encode(v, spec["schema"])
                 _ld_write(field, inner)
             else:
                 raise ValueError("unsupported type for field {}".format(field))
@@ -375,7 +375,7 @@ def pb_encode(values, schema=None):
     return bytes(out)
 
 
-def pb_decode(buf, schema=None, _depth=0, _max_depth=_MAX_NESTING_DEPTH):
+def decode(buf, schema=None, _depth=0, _max_depth=_MAX_NESTING_DEPTH):
     if _depth > _max_depth:
         raise ValueError("message nesting too deep")
     ns = _normalize_schema(schema)
@@ -428,12 +428,12 @@ def pb_decode(buf, schema=None, _depth=0, _max_depth=_MAX_NESTING_DEPTH):
             i += length
             t = spec.get("type") if spec else None
             if spec and spec.get("kind") == "message":
-                v = pb_decode(chunk, spec["schema"], _depth=_depth+1, _max_depth=_max_depth)
+                v = decode(chunk, spec["schema"], _depth=_depth+1, _max_depth=_max_depth)
             elif spec and spec.get("kind") == "repeated" and "type" in spec and t in {"varint", "uint64", "uint32", "int64", "int32", "sint", "sint64", "sint32", "fixed32", "fixed64", "sfixed32", "sfixed64", "float", "double", "bool"}:
                 # Proto3 default: repeated numeric are packed; flatten into list
                 v = _decode_packed(chunk, t)
             elif spec and spec.get("kind") == "repeated" and "schema" in spec:
-                v = pb_decode(chunk, spec["schema"], _depth=_depth+1, _max_depth=_max_depth)
+                v = decode(chunk, spec["schema"], _depth=_depth+1, _max_depth=_max_depth)
             elif spec and spec.get("kind") == "packed":
                 v = _decode_packed(chunk, t)
             elif t == "string":

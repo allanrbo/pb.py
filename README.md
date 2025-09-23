@@ -29,16 +29,16 @@ This is seriously tiny, so I'd suggest you just copy the `pb.py` file into your 
 1) Basic
 
 ```python
-from pb import pb_encode, pb_decode
+import pb
 
 schema = [
   ("varint", "id", 1),
   ("string", "name", 2),
 ]
 data = {"id": 7, "name": "ok"}
-encoded_bytes = pb_encode(data, schema)
+encoded_bytes = pb.encode(data, schema)
 
-assert pb_decode(b'\x08\x07\x12\x02ok', schema) == data
+assert pb.decode(b'\x08\x07\x12\x02ok', schema) == data
 ```
 
 2) Repeated + nested
@@ -58,9 +58,9 @@ data = {
     {"x": 2, "y": 20},
   ],
 }
-encoded_bytes = pb_encode(data, parent_schema)
+encoded_bytes = pb.encode(data, parent_schema)
 
-assert pb_decode(b'\n\x07\x08\x01\x15\n\x00\x00\x00\n\x07\x08\x04\x15\x14\x00\x00\x00', parent_schema) == data
+assert pb.decode(b'\n\x07\x08\x01\x15\n\x00\x00\x00\n\x07\x08\x04\x15\x14\x00\x00\x00', parent_schema) == data
 ```
 
 3) Oneof
@@ -75,10 +75,10 @@ schema = [
     ("varint", "tail", 3),
 ]
 data = {"a": 7, "tail": 1}
-encoded_bytes = pb_encode(data, schema)
+encoded_bytes = pb.encode(data, schema)
 # Encoding with both set raises ValueError.
 
-assert pb_decode(b'\x08\x07\x18\x01', schema) == data
+assert pb.decode(b'\x08\x07\x18\x01', schema) == data
 ```
 
 
